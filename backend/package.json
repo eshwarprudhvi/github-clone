@@ -4,8 +4,8 @@
   "description": "A github-clone by prudhvishwar",
   "main": "index.js",
   "scripts": {
-    "dev": "node server.js",
-    "start": "nodemon server.js"
+    "start": "node server.js",
+    "dev": "nodemon server.js"
   },
   "keywords": [],
   "author": "Prudhvishwar",
