@@ -17,6 +17,11 @@ import mongoose from "mongoose";
 import cors from "cors";
 import express from "express";
 import mainRouter from "./routes/main.router.js";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 
 dotenv.config();
@@ -24,7 +29,19 @@ dotenv.config();
 
 
 yargs(hideBin(process.argv))
-  .command("init", "initiate a new repo", {}, init)
+  .command(
+    "init [repoId]",
+    "initiate a new repo",
+    (yargs) => {
+      yargs.positional("repoId", {
+        description: "MongoDB Repository ID to link to",
+        type: "string",
+      });
+    },
+    async (argv) => {
+      await init(argv.repoId);
+    }
+  )
   .command(
     "add <filePath>",
     "add to repo",
@@ -35,8 +52,8 @@ yargs(hideBin(process.argv))
         demandOption: true,
       });
     },
-    (argv) => {
-      addRepo(argv.filePath);
+    async (argv) => {
+      await addRepo(argv.filePath);
     }
   )
   .command(
@@ -48,8 +65,8 @@ yargs(hideBin(process.argv))
         type: "string",
       });
     },
-    (argv) => {
-      commitRepo(argv.message);
+    async (argv) => {
+      await commitRepo(argv.message);
     }
   )
   .command("pull", "pull from github", {}, pullRepo)
@@ -63,36 +80,33 @@ yargs(hideBin(process.argv))
         type: "string",
       });
     },
-    (argv) => {
-      revertRepo(argv.commitId);
+    async (argv) => {
+      await revertRepo(argv.commitId);
     }
   )
   .parse();
 
 
+import connectDB from "./config/db.js";
+
 const startServer = async () => {
   const PORT = process.env.PORT || 8000;
-  const MONGODB_URL = process.env.MONGODB_URL;
   const app = express();
-app.use(cors({origin:"*"}))
+  app.use(cors({ origin: "*" }));
 
   app.use(express.json());
 
-  app.use("/",mainRouter)
+  app.use("/", mainRouter);
 
-  try {
-    await mongoose.connect(MONGODB_URL);
-    console.log("Database connected");
-  } catch (err) {
-    console.error("Database connection error:", err.message);
-  }
+ 
+
+  await connectDB();
 
   const httpServer = http.createServer(app);
   const io = new Server(httpServer, {
     cors: {
       origin: "*",
       methods: ["GET", "POST"],
-  
     },
   });
 
@@ -111,4 +125,7 @@ app.use(cors({origin:"*"}))
   });
 };
 
-startServer();
+// Only start the server if no command-line arguments are provided
+if (process.argv.length === 2) {
+  startServer();
+}

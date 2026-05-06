@@ -1,7 +1,7 @@
 import fs from "fs/promises";
 import path from "path";
 
-export const init = async () => {
+export const init = async (repoId = "") => {
   try {
     const repoPath = path.resolve(process.cwd(), ".pgit");
     const commitPath = path.join(repoPath, "commits");
@@ -13,6 +13,7 @@ export const init = async () => {
 
     const config = {
       accessToken: process.env.DROPBOX_ACCESS_TOKEN,
+      repoId: repoId,
     };
 
     await fs.writeFile(
@@ -21,6 +22,11 @@ export const init = async () => {
     );
 
     console.log("Initialized a new pgit repository");
+    if (repoId) {
+      console.log(`Linked to MongoDB Repository ID: ${repoId}`);
+    } else {
+      console.log("Note: No Repository ID provided. Use 'init <repoId>' to link to a web repository.");
+    }
   } catch (error) {
     console.error("Error during initialization:", error);
     process.exit(1);

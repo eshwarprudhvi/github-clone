@@ -48,14 +48,12 @@ const signup = async (req, res) => {
     const token = generateToken(savedUser._id);
 
     res.cookie("token", token);
-    res
-      .status(201)
-      .json({
-        message: "User created successfully",
-        result: savedUser,
-        token,
-        userId: savedUser._id,
-      });
+    res.status(201).json({
+      message: "User created successfully",
+      result: savedUser,
+      token,
+      userId: savedUser._id,
+    });
   } catch (error) {
     res
       .status(500)
@@ -64,10 +62,9 @@ const signup = async (req, res) => {
 };
 
 const login = async (req, res) => {
-  const { email, password } = req.body; // email field can be username or email
+  const { email, password } = req.body;
 
   try {
-    // We'll skip formal validation for a moment or adapt it to allow "email" to be a username
     const user = await User.findOne({
       $or: [{ email: email }, { username: email }],
     });
@@ -100,7 +97,14 @@ const getUserProfile = async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
-    res.status(200).json(user);
+    
+    const followersCount = await User.countDocuments({ followedUsers: id });
+    
+   
+    const userData = user.toObject();
+    userData.followersCount = followersCount;
+    
+    res.status(200).json(userData);
   } catch (error) {
     res
       .status(500)
@@ -116,8 +120,11 @@ const updateUserProfile = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
     user.username = req.body.username;
-    user.email = req.body.email;
-    user.password = await bcryptjs.hash(req.body.password, 10);
+
+    if (req.body.password) {
+      user.password = await bcryptjs.hash(req.body.password, 10);
+    }
+
     const result = await user.save();
     res
       .status(200)
@@ -145,6 +152,81 @@ const deleteUser = async (req, res) => {
   }
 };
 
+const followUser = async (req, res) => {
+  const currentUserId = req.params.currentUserId;
+  const userToFollowId = req.params.userToFollowId;
+
+  try {
+    if (String(currentUserId) === String(userToFollowId)) {
+      return res.status(400).json({ message: "You cannot follow yourself" });
+    }
+
+    const currentUser = await User.findById(currentUserId);
+    const userToFollow = await User.findById(userToFollowId);
+
+    if (!currentUser || !userToFollow) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Check if already following (convert to string for comparison)
+    const isAlreadyFollowing = currentUser.followedUsers.some(
+      (id) => String(id) === String(userToFollowId)
+    );
+    if (isAlreadyFollowing) {
+      return res.status(400).json({ message: "Already following this user" });
+    }
+
+    // Add to followedUsers array
+    currentUser.followedUsers.push(userToFollowId);
+    await currentUser.save();
+
+    res.status(200).json({
+      message: "User followed successfully",
+      followedUsers: currentUser.followedUsers,
+    });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: "Error following user", error: error.message });
+  }
+};
+
+const unfollowUser = async (req, res) => {
+  const currentUserId = req.params.currentUserId;
+  const userToUnfollowId = req.params.userToUnfollowId;
+
+  try {
+    const currentUser = await User.findById(currentUserId);
+
+    if (!currentUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Check if following (convert to string for comparison)
+    const isFollowing = currentUser.followedUsers.some(
+      (id) => String(id) === String(userToUnfollowId)
+    );
+    if (!isFollowing) {
+      return res.status(400).json({ message: "Not following this user" });
+    }
+
+    // Remove from followedUsers array
+    currentUser.followedUsers = currentUser.followedUsers.filter(
+      (id) => String(id) !== String(userToUnfollowId)
+    );
+    await currentUser.save();
+
+    res.status(200).json({
+      message: "User unfollowed successfully",
+      followedUsers: currentUser.followedUsers,
+    });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: "Error unfollowing user", error: error.message });
+  }
+};
+
 export {
   allUsers,
   signup,
@@ -152,4 +234,6 @@ export {
   getUserProfile,
   updateUserProfile,
   deleteUser,
+  followUser,
+  unfollowUser,
 };
